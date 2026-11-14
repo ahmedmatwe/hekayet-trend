@@ -1,0 +1,34 @@
+name: heartbeat
+# 💓 النبض الدايم: مواعيد GitHub (cron) بتتأخر أو ما بتشتغلش، فده شغال على طول:
+# كل 10 دقايق يشغّل النشر لو فيه حاجة ميعادها جه، والمصنع لو فاضي، ويسلّم الأعطال الساكتة لفريق الإصلاح.
+# بعد ~5 ساعات ونص بيشغّل نفسه تاني (والكرون احتياطي لو السلسلة اتقطعت).
+on:
+  schedule: [{ cron: '3 */2 * * *' }]
+  workflow_dispatch:
+concurrency: { group: heartbeat, cancel-in-progress: false }
+permissions: { contents: read, actions: write, issues: write }
+env: { GH_REPO: ahmedmatwe/hekayet-trend }
+jobs:
+  beat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: ahmedmatwe/hekayet-trend-core, ssh-key: '${{ secrets.CORE_DEPLOY_KEY }}' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - name: نبض كل 10 دقايق
+        env:
+          GH_TOKEN: ${{ secrets.MEDIA_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          for i in $(seq 1 33); do
+            git pull -q --rebase || true
+            node scripts/heartbeat.mjs || true
+            sleep 600
+          done
+      - name: النبض الجاي
+        if: always()
+        env: { GH_TOKEN: '${{ secrets.MEDIA_TOKEN }}' }
+        run: gh workflow run heartbeat.yml
