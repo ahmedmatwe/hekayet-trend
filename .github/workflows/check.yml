@@ -1,0 +1,22 @@
+name: check
+on: { workflow_dispatch: {} }
+# الكود والبيانات في الريبو الخاص hekayet-trend-core (بمفتاح CORE_DEPLOY_KEY)، والتشغيل والفيديوهات هنا
+env: { GH_REPO: ahmedmatwe/hekayet-trend }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: ahmedmatwe/hekayet-trend-core, ssh-key: '${{ secrets.CORE_DEPLOY_KEY }}' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_IG_USER_ID: ${{ secrets.META_IG_USER_ID }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        run: node scripts/check-youtube.mjs && node scripts/check-meta.mjs

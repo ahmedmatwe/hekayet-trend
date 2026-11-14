@@ -1,0 +1,29 @@
+name: stats
+on:
+  schedule: [{ cron: '0 7 * * *' }]   # 9 الصبح بتوقيت القاهرة
+  workflow_dispatch:
+permissions: { contents: write }
+# الكود والبيانات في الريبو الخاص hekayet-trend-core (بمفتاح CORE_DEPLOY_KEY)، والتشغيل والفيديوهات هنا
+env: { GH_REPO: ahmedmatwe/hekayet-trend }
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: ahmedmatwe/hekayet-trend-core, ssh-key: '${{ secrets.CORE_DEPLOY_KEY }}' }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_IG_USER_ID: ${{ secrets.META_IG_USER_ID }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        run: node scripts/stats.mjs | tee data/last-report.txt
+      - run: |
+          git config user.name "hekayet-trend-bot"; git config user.email "bot@users.noreply.github.com"
+          git add data; git diff --cached --quiet || (git commit -m "إحصائيات يومية" && git pull -q --rebase && git push)

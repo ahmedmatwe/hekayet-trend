@@ -1,0 +1,77 @@
+name: factory
+# المصنع: كل 10 دقايق بيرصد التريند (دورة = فيديو واحد (لحد الحد اليومي في data/config.json). شغال 24 ساعة من غير الماك.
+on:
+  schedule: [{ cron: '*/10 * * * *' }]
+  workflow_dispatch:
+    inputs:
+      once: { description: 'فيديو تجريبي واحد حتى لو المصنع واقف', type: boolean, default: false }
+concurrency: { group: factory, cancel-in-progress: false }
+permissions: { contents: write, actions: write }
+# الكود والبيانات في الريبو الخاص hekayet-trend-core (بمفتاح CORE_DEPLOY_KEY)، والتشغيل والفيديوهات هنا
+env: { GH_REPO: ahmedmatwe/hekayet-trend }
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: ahmedmatwe/hekayet-trend-core, ssh-key: '${{ secrets.CORE_DEPLOY_KEY }}' }
+      - name: البوابة (المصنع واقف؟)
+        id: gate
+        run: |
+          ON=$(node -e "console.log(require('./data/config.json').enabled?'true':'false')")
+          if [ "$ON" = true ] || [ "${{ inputs.once }}" = true ]; then echo "run=true" >> $GITHUB_OUTPUT; else echo "run=false" >> $GITHUB_OUTPUT; echo "المصنع واقف (enabled=false) — مفيش إنتاج"; fi
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with: { node-version: 24, cache: npm, cache-dependency-path: motion/package.json }
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'true'
+        with: { python-version: '3.12', cache: pip, cache-dependency-path: scripts/auto/requirements.txt }
+      - name: أدوات (ffmpeg + faster-whisper + Remotion)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq install -y ffmpeg fonts-noto-color-emoji >/dev/null
+          pip install -q -r scripts/auto/requirements.txt
+          cd motion && npm install --no-audit --no-fund --loglevel=error && npx remotion browser ensure
+      - uses: actions/cache@v4
+        if: steps.gate.outputs.run == 'true'
+        with: { path: ~/.cache/huggingface, key: whisper-large-v3-turbo }
+      - name: دورة إنتاج
+        if: steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          RENDER_CONCURRENCY: '100%'
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BOT_URL: ${{ secrets.BOT_URL }}
+          BOT_INGEST_SECRET: ${{ secrets.BOT_INGEST_SECRET }}
+          WHISPER_MODEL: large-v3-turbo
+          ONCE: ${{ inputs.once && '1' || '' }}
+        run: node scripts/auto/factory.mjs
+      - name: حفظ (الطابور + السجل + ملفات الفيديو النصية)
+        if: always() && steps.gate.outputs.run == 'true'
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          git config user.name "hekayet-trend-bot"; git config user.email "bot@users.noreply.github.com"
+          git add queue data videos || true
+          Q=$(git diff --cached --name-only -- queue | wc -l)
+          git diff --cached --quiet || (git commit -qm "المصنع: دورة إنتاج" && git pull -q --rebase && git push -q)
+          # فيديو جديد في الطابور → النشر يشتغل على طول
+          if [ "$Q" -gt 0 ]; then gh workflow run publish.yml || true; fi
+      - name: معاينة (3 أيام)
+        if: always() && steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with: { name: preview, path: 'videos/*/final/*-social.mp4', if-no-files-found: ignore, retention-days: 3 }
+      - name: الدورة الجاية على طول (ما بنقفش غير عند الحد اليومي)
+        if: always() && steps.gate.outputs.run == 'true' && !inputs.once
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          M=$(node --input-type=module -e "import {dailyTarget} from './scripts/lib.mjs';import fs from 'node:fs';const c=JSON.parse(fs.readFileSync('data/config.json'));const f=fs.existsSync('data/factory.json')?JSON.parse(fs.readFileSync('data/factory.json')):{runs:[]};const d=new Date().toISOString().slice(0,10);const n=f.runs.filter(r=>r.status==='queued'&&r.at.startsWith(d)).length;const last=f.runs.at(-1)||{};console.log(!c.enabled||n>=dailyTarget(c)?'stop':['llm-quota','tts-quota','no-story'].includes(last.status)?'wait':'go')")
+          echo "الحالة: $M"
+          if [ "$M" = stop ]; then echo "وصلنا الحد اليومي — الكرون هيبدأ بكرة"; exit 0; fi
+          if [ "$M" = wait ]; then echo "كوتة/مفيش أخبار — نستنى 10 دقايق ونرجع"; sleep 600; fi
+          gh workflow run factory.yml
