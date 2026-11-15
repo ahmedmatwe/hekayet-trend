@@ -23,4 +23,4 @@ jobs:
           GH_TOKEN: ${{ secrets.MEDIA_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: node scripts/publish-audit.mjs --force; node scripts/check-buffer.mjs; node scripts/check-youtube.mjs && node scripts/check-meta.mjs
+        run: node scripts/cancel-buffer.mjs; node scripts/publish-audit.mjs --force; node scripts/check-buffer.mjs; node scripts/check-youtube.mjs && node scripts/check-meta.mjs
