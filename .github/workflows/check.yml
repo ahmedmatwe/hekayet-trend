@@ -19,4 +19,5 @@ jobs:
           META_IG_USER_ID: ${{ secrets.META_IG_USER_ID }}
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
-        run: node scripts/check-youtube.mjs && node scripts/check-meta.mjs
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+        run: node scripts/check-buffer.mjs; node scripts/check-youtube.mjs && node scripts/check-meta.mjs
