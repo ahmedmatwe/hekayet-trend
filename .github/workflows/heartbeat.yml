@@ -1,12 +1,13 @@
 name: heartbeat
 # 💓 النبض الدايم: مواعيد GitHub (cron) بتتأخر أو ما بتشتغلش، فده شغال على طول:
 # كل 10 دقايق يشغّل النشر لو فيه حاجة ميعادها جه، والمصنع لو فاضي، ويسلّم الأعطال الساكتة لفريق الإصلاح.
+# وكل ساعة فريق مراقبة النشر يتأكد إن كل منصة بتنشر فعلًا ويصلّح لوحده (publish-audit.mjs).
 # بعد ~5 ساعات ونص بيشغّل نفسه تاني (والكرون احتياطي لو السلسلة اتقطعت).
 on:
   schedule: [{ cron: '3 */2 * * *' }]
   workflow_dispatch:
 concurrency: { group: heartbeat, cancel-in-progress: false }
-permissions: { contents: read, actions: write, issues: write }
+permissions: { contents: write, actions: write, issues: write }
 env: { GH_REPO: ahmedmatwe/hekayet-trend }
 jobs:
   beat:
@@ -22,10 +23,20 @@ jobs:
           GH_TOKEN: ${{ secrets.MEDIA_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_IG_USER_ID: ${{ secrets.META_IG_USER_ID }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
         run: |
           for i in $(seq 1 33); do
             git pull -q --rebase || true
             node scripts/heartbeat.mjs || true
+            node scripts/publish-audit.mjs || true   # 🔎 فريق مراقبة النشر (كل ساعة)
             sleep 600
           done
       - name: النبض الجاي

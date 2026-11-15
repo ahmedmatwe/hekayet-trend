@@ -20,4 +20,7 @@ jobs:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
-        run: node scripts/check-buffer.mjs; node scripts/check-youtube.mjs && node scripts/check-meta.mjs
+          GH_TOKEN: ${{ secrets.MEDIA_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node scripts/publish-audit.mjs --force; node scripts/check-buffer.mjs; node scripts/check-youtube.mjs && node scripts/check-meta.mjs
